@@ -1,4 +1,4 @@
-"""Shortest paths and path lengths using the A* ("A star") algorithm.
+"""Shortest paths and path lengths using the Beam Stacked Search algorithm.
 """
 from heapq import heappush, heappop
 from itertools import count
@@ -72,33 +72,22 @@ def beam_path(G, source, target, heuristic=None, weight='weight'):
     pop = heappop
     weight = _weight_function(G, weight)
 
-    # The queue stores priority, node, cost to reach, and parent.
-    # Uses Python heapq to keep in priority order.
-    # Add a counter to the queue to prevent the underlying heap from
-    # attempting to compare the nodes themselves. The hash breaks ties in the
-    # priority and is guaranteed unique for all nodes in the graph.
-    queue = [(0, next(c), source, 0, None)]
 
-    # Maps enqueued nodes to distance of discovered paths and the
-    # computed heuristics to target. We avoid computing the heuristics
-    # more than once and inserting the node into the queue too many times.
-    enqueued = {}
-    # Maps explored nodes to parent closest to the source.
-    explored = {}
     #It is defined a specific width
     width = 2
-    
+   
+    #This function gives us the "best" two neighbours of a node "v" by using the function "relative_distance"
     def successors(v):
         return iter(sorted(G.neighbors(v), key = relative_distance, reverse = True) [:width])
 
     for e in generic_dfs_edges(G, source, successors(source)):
        yield e 
 
-    #This is the 'value' function that tells us how much 'is good' a node
+    
     def relative_distance(source, node):
         return dist(source, node)
 
-    #This is my DFS function that returns a path
+    #This is the DFS function that returns a path if it exists
     def generic_dfs_edges(G, source, neighbors = None, depth_limit = None):
 
         visited ={source}
@@ -109,27 +98,32 @@ def beam_path(G, source, target, heuristic=None, weight='weight'):
         queue = deque([(source, depth_limit, neighbors(source))])
 
         while queue:
-            _, __, curnode, dist, parent = pop(queue)
-
-            if curnode == target:
-                path = [curnode]
-                node = parent
-                while node is not None:
-                    path.append(node)
-                    node = explored[node]
-                path.reverse()
-                return path
-
+            
             parent, depth_now, children = queue[-1]
+
             try:
                 child = next(children)
+
+                if child == target:
+                    path = [child]
+                    node = parent
+                    
+                    while node is not None:
+                        path.append(node)
+                        node = visited[node]
+                    path.reverse()
+                    return path
+
                 if child not in visited:
                     yield parent, child
                     visited.add(child)
+                    
                     if depth_now > 1:
                         queue.append((child, depth_now - 1, neighbors(child)))
+           
             except StackIteration:
                 queue.pop()
+        
         raise nx.NetworkXNoPath(f"Node {target} not reachable from {source}")
 
  
